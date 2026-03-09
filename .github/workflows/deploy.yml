@@ -23,15 +23,15 @@ jobs:
             set -e
 
             if [ ! -d "/opt/quant_platform/.git" ]; then
-              git clone https://github.com/Adriana-777/quant-platform.git /opt/quant_platform
+              git clone https://Adriana-777:${{ secrets.GH_TOKEN }}@github.com/Adriana-777/quant-platform.git /opt/quant_platform
             fi
 
             cd /opt/quant_platform
+            git remote set-url origin https://Adriana-777:${{ secrets.GH_TOKEN }}@github.com/Adriana-777/quant-platform.git
             git pull origin main
 
             if [ ! -f ".env" ]; then
               cp .env.example .env
-              echo "⚠️  请手动填写 .env 里的 API Key"
             fi
 
             docker-compose -f infra/docker/docker-compose.yml pull
