@@ -1,0 +1,57 @@
+quant_platform/
+├── config/                        # 所有配置文件
+│   ├── settings.py                # 全局配置（从环境变量读取）
+│   └── logging.yaml               # 日志格式配置
+│
+├── data/                          # 阶段一、二：数据层
+│   ├── feeds/                     # 行情采集
+│   │   ├── base.py                # 抽象基类 BaseFeed
+│   │   ├── binance_feed.py        # Binance WebSocket 采集
+│   │   └── alpaca_feed.py         # 美股 Alpaca WebSocket 采集
+│   ├── kafka/                     # Kafka 生产者/消费者
+│   │   ├── producer.py
+│   │   └── consumer.py
+│   └── storage/                   # 存储层
+│       ├── redis_store.py         # 实时状态
+│       └── pg_store.py            # 历史持久化
+│
+├── engine/                        # 阶段三、四：核心引擎
+│   ├── backtest/
+│   │   ├── engine.py              # 回测主引擎（事件驱动）
+│   │   ├── broker.py              # 模拟撮合/成本计算
+│   │   └── performance.py        # 绩效统计（Sharpe、MaxDD等）
+│   └── live/
+│       ├── executor.py            # 实盘执行
+│       └── risk.py                # 风控模块（回撤限制）
+│
+├── strategy/                      # 策略层
+│   ├── base.py                    # 抽象基类 BaseStrategy
+│   ├── examples/
+│   │   ├── ma_cross.py            # 双均线策略（示例）
+│   │   └── mean_reversion.py      # 均值回归（示例）
+│   └── registry.py                # 策略注册表（管理多策略并发）
+│
+├── monitor/                       # 阶段五：监控平台
+│   ├── dashboard.py               # Dash/Plotly 实时看板
+│   └── alerting.py                # 告警脚本
+│
+├── scripts/                       # 运维脚本
+│   ├── start_feeds.sh             # 启动行情采集
+│   └── start_monitor.sh           # 启动监控
+│
+├── tests/                         # 单元测试
+│   ├── test_feeds.py
+│   ├── test_backtest.py
+│   └── test_strategy.py
+│
+├── docker/                        # 容器化
+│   ├── Dockerfile
+│   └── docker-compose.yml         # 一键启动 Kafka + Redis + PostgreSQL
+│
+├── notebooks/                     # 策略研究用 Jupyter
+│   └── strategy_research.ipynb
+│
+├── .env.example                   # 环境变量模板（不提交真实密钥）
+├── .gitignore
+├── requirements.txt
+└── README.md

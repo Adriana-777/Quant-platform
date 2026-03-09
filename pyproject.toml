@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "quant-platform"
+version = "0.1.0"
+description = "多市场实时行情聚合与策略回测平台"
+requires-python = ">=3.11"
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
