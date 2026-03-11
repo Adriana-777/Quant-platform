@@ -141,47 +141,49 @@ class BinanceFeed:
 
     async def _connect_and_consume(self):
         """建立 WebSocket 连接并持续消费消息。"""
-    streams_path = "/".join(STREAMS)
-    
-    # 测试网和主网 URL 格式不同
-    if self.settings.binance.testnet:
-        url = f"wss://testnet.binance.vision/stream?streams={streams_path}"
-    else:
-        url = f"wss://stream.binance.com:9443/stream?streams={streams_path}"
+        streams_path = "/".join(STREAMS)
+        # 订阅多个流：/ws/stream1/stream2/stream3
+        # 测试网和主网 URL 格式不同
+        if self.settings.binance.testnet:
+            url = f"wss://testnet.binance.vision/stream?streams={streams_path}"
+        else:
+            url = f"wss://stream.binance.com:9443/stream?streams={streams_path}"
 
-    logger.info(f"🔌 连接 Binance WebSocket: {url}")
+        logger.info(f"🔌 连接 Binance WebSocket: {url}")
 
-    async with websockets.connect(
-        url,
-        ping_interval=20,
-        ping_timeout=10,
-        close_timeout=5,
-    ) as ws:
-        logger.info(f"✅ WebSocket 连接成功 | 订阅: {STREAMS}")
 
-        async for raw_msg in ws:
-            if not self._running:
-                break
+        async with websockets.connect(
+            url,
+            ping_interval=20,     # 每 20s 发送 ping
+            ping_timeout=10,      # 10s 没收到 pong 则断开
+            close_timeout=5,
+        ) as ws:
+            logger.info(f"✅ WebSocket 连接成功 | 订阅: {STREAMS}")
 
-            try:
-                data = json.loads(raw_msg)
+            async for raw_msg in ws:
+                if not self._running:
+                    break
 
-                if "data" in data:
-                    payload = data["data"]
-                else:
-                    payload = data
+                try:
+                    data = json.loads(raw_msg)
 
-                if payload.get("e") == "aggTrade":
-                    tick = self._parse_agg_trade(payload)
-                    if tick:
-                        self._send_to_kafka(tick)
-                        self._msg_count += 1
-                        self._log_stats()
+                    # 多流模式下消息格式：{"stream": "btcusdt@aggTrade", "data": {...}}
+                    if "data" in data:
+                        payload = data["data"]
+                    else:
+                        payload = data
 
-            except json.JSONDecodeError as e:
-                logger.warning(f"JSON 解析失败: {e}")
-            except Exception as e:
-                logger.error(f"处理消息时出错: {e}")
+                    if payload.get("e") == "aggTrade":
+                        tick = self._parse_agg_trade(payload)
+                        if tick:
+                            self._send_to_kafka(tick)
+                            self._msg_count += 1
+                            self._log_stats()
+
+                except json.JSONDecodeError as e:
+                    logger.warning(f"JSON 解析失败: {e}")
+                except Exception as e:
+                    logger.error(f"处理消息时出错: {e}")
 
     async def run(self):
         """主循环，带指数退避重连。"""
