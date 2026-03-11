@@ -145,7 +145,7 @@ class BinanceFeed:
         # 订阅多个流：/ws/stream1/stream2/stream3
         # 测试网和主网 URL 格式不同
         if self.settings.binance.testnet:
-            url = f"wss://testnet.binance.vision/stream?streams={streams_path}"
+            url = f"wss://stream.testnet.binance.vision/ws/{STREAMS[0]}"
         else:
             url = f"wss://stream.binance.com:9443/stream?streams={streams_path}"
 
