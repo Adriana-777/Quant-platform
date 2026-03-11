@@ -182,10 +182,11 @@ class StorageWriter:
         return Consumer({
             "bootstrap.servers": self.settings.kafka.bootstrap_servers,
             "group.id": ConsumerGroups.STORAGE_WRITER,
-            "auto.offset.reset": "earliest",       # 从最早的消息开始消费
-            "enable.auto.commit": False,            # 手动提交 Offset，保证不丢数据
-            "max.poll.interval.ms": 30000,
-        })
+            "auto.offset.reset": "earliest",
+            "enable.auto.commit": False,
+            "session.timeout.ms": 30000,
+            "max.poll.interval.ms": 300000,
+})
 
     def _parse_tick(self, raw: str) -> Optional[Tick]:
         try:
