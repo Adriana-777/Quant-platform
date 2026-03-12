@@ -17,15 +17,38 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import websockets
+import time as time_module
 from confluent_kafka import Producer
 from loguru import logger
 
 from data.schemas.models import Market, Tick
 from infra.config.settings import get_settings
 from infra.kafka.topics import Topics
+from prometheus_client import Counter, Gauge, Histogram, start_http_server
 
 
 # ── 配置 ──────────────────────────────────────
+# ── Prometheus 指标 ────────────────────────────
+TICK_COUNTER = Counter(
+    'quant_tick_received_total',
+    'Total ticks received',
+    ['symbol']
+)
+LATEST_PRICE = Gauge(
+    'quant_latest_price',
+    'Latest price',
+    ['symbol']
+)
+TICK_LATENCY = Histogram(
+    'quant_tick_latency_seconds',
+    'End-to-end tick latency',
+    buckets=[0.01, 0.05, 0.1, 0.5, 1.0]
+)
+WEBSOCKET_STATUS = Gauge(
+    'quant_websocket_connected',
+    'WebSocket connection status (1=connected, 0=disconnected)'
+)
+
 SYMBOLS = [
     "btcusdt",   # 比特币
     "ethusdt",   # 以太坊
@@ -99,6 +122,13 @@ class BinanceFeed:
         }
         """
         try:
+            # 计算端到端延迟（交易所时间戳到现在）
+            exchange_time = raw["T"] / 1000  # 毫秒转秒
+            latency = time_module.time() - exchange_time
+            TICK_LATENCY.observe(latency)
+            TICK_COUNTER.labels(symbol=raw["s"]).inc()
+            LATEST_PRICE.labels(symbol=raw["s"]).set(float(raw["p"]))
+
             return Tick(
                 symbol=raw["s"],
                 market=Market.CRYPTO,
@@ -159,6 +189,7 @@ class BinanceFeed:
             close_timeout=5,
         ) as ws:
             logger.info(f"✅ WebSocket 连接成功 | 订阅: {STREAMS}")
+            WEBSOCKET_STATUS.set(1)
 
             async for raw_msg in ws:
                 if not self._running:
@@ -191,6 +222,9 @@ class BinanceFeed:
         retry_count = 0
         retry_delay = BASE_RETRY_DELAY
 
+        start_http_server(8000)
+        logger.info("📡 Metrics 服务启动: http://0.0.0.0:8000/metrics")
+
         logger.info("🚀 Binance 行情采集服务启动")
 
         while self._running:
@@ -203,6 +237,7 @@ class BinanceFeed:
 
                 # 非预期断开，重连
                 logger.warning("WebSocket 连接断开，准备重连...")
+                WEBSOCKET_STATUS.set(0)
                 retry_count = 0
                 retry_delay = BASE_RETRY_DELAY
 
