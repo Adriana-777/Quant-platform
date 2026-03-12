@@ -1,19 +1,12 @@
-version: "3.9"
-
-# 本地开发基础设施
-# 启动命令：docker-compose -f infra/docker/docker-compose.yml up -d
-# 停止命令：docker-compose -f infra/docker/docker-compose.yml down
-
 services:
-
-  # ── Kafka + Zookeeper ─────────────────────
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: quant_zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
-    ports:
-      - "2181:2181"
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - quant_net
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -27,32 +20,32 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"  # 手动建 topic，防止拼写错误
-      KAFKA_LOG_RETENTION_HOURS: 24
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    networks:
+      - quant_net
 
-  # Kafka 管理 UI（可选，方便查看 topic 和消息）
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: quant_kafka_ui
-    depends_on:
-      - kafka
     ports:
       - "8080:8080"
     environment:
-      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_NAME: quant
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - quant_net
 
-  # ── Redis ─────────────────────────────────
   redis:
     image: redis:7.2-alpine
     container_name: quant_redis
     ports:
       - "6379:6379"
     command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
-    volumes:
-      - redis_data:/data
+    networks:
+      - quant_net
 
-  # ── PostgreSQL ────────────────────────────
   postgres:
     image: postgres:15-alpine
     container_name: quant_postgres
@@ -64,7 +57,52 @@ services:
       POSTGRES_DB: quant_platform
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - quant_net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: quant_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=30d'
+    networks:
+      - quant_net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: quant_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: quant123
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - quant_net
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: quant_node_exporter
+    ports:
+      - "9100:9100"
+    networks:
+      - quant_net
 
 volumes:
-  redis_data:
   postgres_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  quant_net:
+    driver: bridge
